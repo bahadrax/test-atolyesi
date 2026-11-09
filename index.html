@@ -313,6 +313,8 @@ html[data-theme="love"] .bar i{background:linear-gradient(90deg,#e48ab5,#a978d3)
 
 .lib-grip{cursor:grab;touch-action:none;user-select:none;padding:4px 6px;color:var(--muted);font-size:18px}
 .lib-edit .row.dragging{opacity:.6;outline:2px dashed var(--green);border-radius:10px}
+
+.ink-tools{margin:0 0 12px;position:relative;z-index:3}.ink-options{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0}.ink-options[hidden]{display:none}.ink-options small{color:var(--muted);font-size:11px}.ink-color{background:var(--ink);width:28px;height:28px;min-width:28px;padding:0;border-radius:50%;border:2px solid var(--paper,#fff)}.ink-canvas{position:absolute;inset:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:inherit}.ink-options select{width:auto;min-width:80px}
 </style>
 </head>
 <body>
@@ -532,6 +534,33 @@ function helpExtra(){return `<article><h3>Profiller</h3><p>Üst çubuktaki 👤 
 
 // ── Android sarmalayıcı: geri tuşu (true = uygulama işledi) ──────────────────
 window.__hostBack=()=>{if($('#modal').children.length){closeDialog();return true;}const sb=$('#sidebar');if(sb?.classList.contains('open')){sb.classList.remove('open');return true;}if(view==='study'){openBook(bookId);return true;}if(view!=='library'){nav('library');return true;}return false;};
+
+// Soru üzerinde akıcı, cihazda saklanan karalama katmanı.
+(()=>{
+let enabled=false,color='#d32f2f',width=2.5,canvas,ctx,strokes=[],active=null,key='',observer;
+const colors=['#d32f2f','#1565c0','#2e7d32','#202124','#8e24aa'];
+function storageKey(){return 'ta-ink:'+store.active+':'+currentBook.id+':'+currentTest.id+':'+currentTest.questions[currentState.index].id;}
+function persist(){try{localStorage.setItem(key,JSON.stringify(strokes));}catch(e){toast('Çizim cihazda saklanamadı.');}}
+function path(s){const p=s.points;if(!p.length)return;const w=canvas.clientWidth,h=canvas.clientHeight;ctx.strokeStyle=s.color;ctx.fillStyle=s.color;ctx.lineWidth=s.width;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(p[0][0]*w,p[0][1]*h);if(p.length===1){ctx.arc(p[0][0]*w,p[0][1]*h,s.width/2,0,Math.PI*2);ctx.fill();return;}for(let i=1;i<p.length-1;i++)ctx.quadraticCurveTo(p[i][0]*w,p[i][1]*h,(p[i][0]+p[i+1][0])*w/2,(p[i][1]+p[i+1][1])*h/2);const last=p[p.length-1];ctx.lineTo(last[0]*w,last[1]*h);ctx.stroke();}
+function draw(){if(!ctx)return;ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);strokes.forEach(path);if(active)path(active);}
+function resize(){if(!canvas?.isConnected)return;const r=canvas.parentElement.getBoundingClientRect(),d=window.devicePixelRatio||1;canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);ctx=canvas.getContext('2d');ctx.setTransform(d,0,0,d,0,0);draw();}
+function point(e){const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];}
+function attach(){observer?.disconnect();if(view!=='study'){enabled=false;return;}const head=document.querySelector('.study-head'),paper=document.querySelector('article.question');if(!head||!paper)return;
+ const tools=document.createElement('div');tools.className='ink-tools';tools.innerHTML=`<button class="small ink-toggle ${enabled?'primary':''}" aria-label="Kalemi aç veya kapat" aria-pressed="${enabled}" title="Soru üzerinde çiz">✎ Kalem</button><div class="ink-options" ${enabled?'':'hidden'}><span>Renk</span>${colors.map(c=>`<button class="ink-color" style="--ink:${c};${c===color?'outline:2px solid var(--text);outline-offset:2px':''}" aria-label="${({'#d32f2f':'Kırmızı','#1565c0':'Mavi','#2e7d32':'Yeşil','#202124':'Siyah','#8e24aa':'Mor'})[c]} kalem" data-color="${c}"></button>`).join('')}<select aria-label="Kalem kalınlığı"><option value="2.5" ${width===2.5?'selected':''}>İnce</option><option value="4" ${width===4?'selected':''}>Orta</option><option value="7" ${width===7?'selected':''}>Kalın</option></select><button class="small ink-undo">Geri al</button><button class="small ink-clear">Temizle</button><small>Çizimler bu cihazda saklanır.</small></div>`;head.after(tools);
+ paper.style.position='relative';canvas=document.createElement('canvas');canvas.className='ink-canvas';canvas.style.pointerEvents=enabled&&!locked?'auto':'none';canvas.setAttribute('aria-label','Soru üzerinde çizim alanı');paper.append(canvas);key=storageKey();try{strokes=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(strokes))strokes=[];}catch(e){strokes=[];}active=null;
+ tools.querySelector('.ink-toggle').onclick=()=>{enabled=!enabled;tools.querySelector('.ink-options').hidden=!enabled;tools.querySelector('.ink-toggle').classList.toggle('primary',enabled);tools.querySelector('.ink-toggle').setAttribute('aria-pressed',String(enabled));canvas.style.pointerEvents=enabled&&!locked?'auto':'none';};
+ tools.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;tools.querySelectorAll('[data-color]').forEach(x=>{x.style.outline=x===b?'2px solid var(--text)':'';x.style.outlineOffset='2px';});});
+ tools.querySelector('select').onchange=e=>width=Number(e.target.value);
+ tools.querySelector('.ink-undo').onclick=()=>{strokes.pop();persist();draw();};
+ tools.querySelector('.ink-clear').onclick=()=>{strokes=[];persist();draw();};
+ canvas.onpointerdown=e=>{if(!enabled||locked||e.button!==0)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);active={color,width,points:[point(e)]};draw();};
+ canvas.onpointermove=e=>{if(!active)return;e.preventDefault();for(const v of e.getCoalescedEvents?.()||[e])active.points.push(point(v));draw();};
+ const finish=e=>{if(!active)return;active.points.push(point(e));strokes.push(active);active=null;persist();draw();};canvas.onpointerup=finish;canvas.onpointercancel=finish;
+ observer=new ResizeObserver(resize);observer.observe(paper);resize();
+}
+const original=render;render=function(){original();attach();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&enabled){enabled=false;const b=document.querySelector('.ink-toggle');if(b){b.setAttribute('aria-pressed','false');b.classList.remove('primary');}document.querySelector('.ink-options')?.setAttribute('hidden','');if(canvas)canvas.style.pointerEvents='none';}});
+})();
 
 // ── Google Drive senkronu (web sürümü) ───────────────────────────────────────
 // "Google ile giriş" (Google Identity Services, yalnız drive.file izni): uygulama Drive'da yalnız kendi açtığı
