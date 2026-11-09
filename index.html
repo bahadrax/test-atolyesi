@@ -738,7 +738,7 @@ function markUnk(){if(view!=='study'||!currentTest)return;const s=currentState,q
 // önce kütüphane seçtirir. Favoriler profile özeldir (state.favs, senkronlanır); Son kullanılanlar profilin çözüm
 // damgalarından hesaplanır.
 const DEF_LIBS=['İngilizce','ALES','İlahiyat Alan Bilgisi'];
-const LIB_BY_ID={'rauf-sara-dhbt1-2025':'İlahiyat Alan Bilgisi','rauf-sara-dhbt2-2025':'İlahiyat Alan Bilgisi'};
+const LIB_BY_ID={'ales-cikmis-sorular':'ALES','rauf-sara-dhbt1-2025':'İlahiyat Alan Bilgisi','rauf-sara-dhbt2-2025':'İlahiyat Alan Bilgisi'};
 let pendingLib=null;
 // Kütüphane düzeni PROFİLE ÖZELDİR: state.libCfg = {libs:[ad…], assign:{kitapId:kütüphane}, t}. Profille birlikte
 // senkronlanır (P olayı). Atanmamış her kitap "Diğer"dedir; yeni profilde bütün kitaplar "Diğer"de görünür.
