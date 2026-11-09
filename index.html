@@ -315,6 +315,8 @@ html[data-theme="love"] .bar i{background:linear-gradient(90deg,#e48ab5,#a978d3)
 .lib-edit .row.dragging{opacity:.6;outline:2px dashed var(--green);border-radius:10px}
 
 .ink-tools{margin:0 0 12px;position:relative;z-index:3}.ink-options{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0}.ink-options[hidden]{display:none}.ink-options small{color:var(--muted);font-size:11px}.ink-color{background:var(--ink);width:28px;height:28px;min-width:28px;padding:0;border-radius:50%;border:2px solid var(--paper,#fff)}.ink-canvas{position:absolute;inset:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:inherit}.ink-options select{width:auto;min-width:80px}
+
+.question-title{position:relative;z-index:3}.ink-toggle{padding:5px 9px!important;min-width:30px}.ink-float{position:fixed;z-index:10000;width:38px}.ink-float[hidden]{display:none}.ink-handle{width:38px;height:38px;min-width:38px;padding:0;border-radius:50%;background:var(--paper,#fff);color:var(--text,#222);box-shadow:0 2px 10px #0003;touch-action:none;user-select:none;cursor:grab;font-size:19px}.ink-handle.is-drawing{background:#245e52;color:#fff}.ink-handle:active{cursor:grabbing}.ink-palette{position:absolute;top:46px;width:220px;max-width:calc(100vw - 16px);padding:12px;border:1px solid var(--line,#ddd);border-radius:14px;background:var(--paper,#fff);color:var(--text,#222);box-shadow:0 5px 24px #0003;display:flex;flex-direction:column;gap:10px}.ink-palette[hidden]{display:none}.ink-palette.ink-above{top:auto;bottom:46px}.ink-colors,.ink-modes{display:flex;gap:8px;align-items:center}.ink-color.selected{outline:2px solid var(--text,#222);outline-offset:2px}.ink-palette small{font-size:11px;line-height:1.5;color:var(--muted)}.ink-palette select{width:100%}.ink-stop{width:100%}
 </style>
 </head>
 <body>
@@ -537,7 +539,7 @@ window.__hostBack=()=>{if($('#modal').children.length){closeDialog();return true
 
 // Soru üzerinde akıcı, cihazda saklanan karalama katmanı.
 (()=>{
-let enabled=false,color='#d32f2f',width=2.5,canvas,ctx,strokes=[],active=null,key='',observer;
+let enabled=false,drawing=false,panelOpen=false,pos={x:12,y:Math.round(innerHeight*.45)},color='#d32f2f',width=2.5,canvas,ctx,strokes=[],active=null,key='',observer;
 const colors=['#d32f2f','#1565c0','#2e7d32','#202124','#8e24aa'];
 function storageKey(){return 'ta-ink:'+store.active+':'+currentBook.id+':'+currentTest.id+':'+currentTest.questions[currentState.index].id;}
 function persist(){try{localStorage.setItem(key,JSON.stringify(strokes));}catch(e){toast('Çizim cihazda saklanamadı.');}}
@@ -545,21 +547,38 @@ function path(s){const p=s.points;if(!p.length)return;const w=canvas.clientWidth
 function draw(){if(!ctx)return;ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);strokes.forEach(path);if(active)path(active);}
 function resize(){if(!canvas?.isConnected)return;const r=canvas.parentElement.getBoundingClientRect(),d=window.devicePixelRatio||1;canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);ctx=canvas.getContext('2d');ctx.setTransform(d,0,0,d,0,0);draw();}
 function point(e){const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];}
-function attach(){observer?.disconnect();if(view!=='study'){enabled=false;return;}const head=document.querySelector('.study-head'),paper=document.querySelector('article.question');if(!head||!paper)return;
- const tools=document.createElement('div');tools.className='ink-tools';tools.innerHTML=`<button class="small ink-toggle ${enabled?'primary':''}" aria-label="Kalemi aç veya kapat" aria-pressed="${enabled}" title="Soru üzerinde çiz">✎ Kalem</button><div class="ink-options" ${enabled?'':'hidden'}><span>Renk</span>${colors.map(c=>`<button class="ink-color" style="--ink:${c};${c===color?'outline:2px solid var(--text);outline-offset:2px':''}" aria-label="${({'#d32f2f':'Kırmızı','#1565c0':'Mavi','#2e7d32':'Yeşil','#202124':'Siyah','#8e24aa':'Mor'})[c]} kalem" data-color="${c}"></button>`).join('')}<select aria-label="Kalem kalınlığı"><option value="2.5" ${width===2.5?'selected':''}>İnce</option><option value="4" ${width===4?'selected':''}>Orta</option><option value="7" ${width===7?'selected':''}>Kalın</option></select><button class="small ink-undo">Geri al</button><button class="small ink-clear">Temizle</button><small>Çizimler bu cihazda saklanır.</small></div>`;head.after(tools);
- paper.style.position='relative';canvas=document.createElement('canvas');canvas.className='ink-canvas';canvas.style.pointerEvents=enabled&&!locked?'auto':'none';canvas.setAttribute('aria-label','Soru üzerinde çizim alanı');paper.append(canvas);key=storageKey();try{strokes=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(strokes))strokes=[];}catch(e){strokes=[];}active=null;
- tools.querySelector('.ink-toggle').onclick=()=>{enabled=!enabled;tools.querySelector('.ink-options').hidden=!enabled;tools.querySelector('.ink-toggle').classList.toggle('primary',enabled);tools.querySelector('.ink-toggle').setAttribute('aria-pressed',String(enabled));canvas.style.pointerEvents=enabled&&!locked?'auto':'none';};
- tools.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;tools.querySelectorAll('[data-color]').forEach(x=>{x.style.outline=x===b?'2px solid var(--text)':'';x.style.outlineOffset='2px';});});
- tools.querySelector('select').onchange=e=>width=Number(e.target.value);
- tools.querySelector('.ink-undo').onclick=()=>{strokes.pop();persist();draw();};
- tools.querySelector('.ink-clear').onclick=()=>{strokes=[];persist();draw();};
- canvas.onpointerdown=e=>{if(!enabled||locked||e.button!==0)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);active={color,width,points:[point(e)]};draw();};
- canvas.onpointermove=e=>{if(!active)return;e.preventDefault();for(const v of e.getCoalescedEvents?.()||[e])active.points.push(point(v));draw();};
- const finish=e=>{if(!active)return;active.points.push(point(e));strokes.push(active);active=null;persist();draw();};canvas.onpointerup=finish;canvas.onpointercancel=finish;
- observer=new ResizeObserver(resize);observer.observe(paper);resize();
+
+function attach(){
+ observer?.disconnect();document.querySelector('.ink-float')?.remove();
+ if(view!=='study'){enabled=false;drawing=false;panelOpen=false;return;}
+ const title=document.querySelector('.question-title .q-title-tools'),paper=document.querySelector('article.question');if(!title||!paper)return;
+ const toggle=document.createElement('button');toggle.className='small ink-toggle';toggle.title='Kalem araçlarını aç veya tamamen kapat';toggle.setAttribute('aria-label','Kalem araçları');toggle.textContent='✎';title.prepend(toggle);
+ paper.style.position='relative';canvas=document.createElement('canvas');canvas.className='ink-canvas';canvas.setAttribute('aria-label','Soru üzerinde çizim alanı');paper.append(canvas);
+ key=storageKey();try{strokes=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(strokes))strokes=[];}catch(e){strokes=[];}active=null;
+ const dock=document.createElement('div');dock.className='ink-float';dock.innerHTML=`<button class="ink-handle" aria-label="Kalem menüsü; basılı tutup sürükle" title="Dokun: seçenekler · Basılı tut: taşı">✎</button><div class="ink-palette" hidden><b>Kalem</b><div class="ink-modes"><button class="small ink-draw">✎ Çiz</button><button class="small ink-pan">✋ Kaydır</button></div><div class="ink-colors">${colors.map((c,i)=>`<button class="ink-color" style="--ink:${c}" aria-label="${['Kırmızı','Mavi','Yeşil','Siyah','Mor'][i]} kalem" data-color="${c}"></button>`).join('')}</div><select aria-label="Kalem kalınlığı"><option value="2.5">İnce</option><option value="4">Orta</option><option value="7">Kalın</option></select><div class="ink-modes"><button class="small ink-undo">Geri al</button><button class="small ink-clear">Temizle</button></div><button class="small ink-stop">× Çizimi durdur</button><small>Kaydır ile normal kaydırma.<br>Çizerken iki parmakla da kaydırabilirsin.</small></div>`;document.body.append(dock);
+ const handle=dock.querySelector('.ink-handle'),palette=dock.querySelector('.ink-palette');
+ function position(){pos.x=Math.max(4,Math.min(innerWidth-44,pos.x));pos.y=Math.max(8,Math.min(innerHeight-48,pos.y));dock.style.left=pos.x+'px';dock.style.top=pos.y+'px';palette.style.left=Math.min(0,innerWidth-pos.x-240)+'px';palette.classList.toggle('ink-above',pos.y>innerHeight-325);}
+ function update(){dock.hidden=!enabled;toggle.classList.toggle('primary',enabled);toggle.setAttribute('aria-pressed',String(enabled));canvas.style.pointerEvents=enabled&&drawing&&!locked?'auto':'none';palette.hidden=!panelOpen;handle.classList.toggle('is-drawing',drawing);handle.textContent=drawing?'✎':'✋';dock.querySelector('.ink-draw').classList.toggle('primary',drawing);dock.querySelector('.ink-pan').classList.toggle('primary',!drawing);dock.querySelector('select').value=String(width);dock.querySelectorAll('[data-color]').forEach(b=>b.classList.toggle('selected',b.dataset.color===color));position();}
+ toggle.onclick=()=>{enabled=!enabled;drawing=enabled;panelOpen=false;update();};
+ let drag=null,suppress=false;
+ handle.onpointerdown=e=>{if(e.button!==0)return;handle.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,px:pos.x,py:pos.y,at:performance.now(),moved:false};suppress=false;};
+ handle.onpointermove=e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>6&&(e.pointerType!=='touch'||performance.now()-drag.at>220))drag.moved=true;if(drag.moved){pos={x:drag.px+dx,y:drag.py+dy};position();}};
+ handle.onpointerup=()=>{suppress=!!drag?.moved;drag=null;};handle.onpointercancel=()=>{suppress=true;drag=null;};
+ handle.onclick=()=>{if(suppress){suppress=false;return;}panelOpen=!panelOpen;update();};
+ dock.querySelector('.ink-draw').onclick=()=>{drawing=true;panelOpen=false;update();};
+ dock.querySelector('.ink-pan').onclick=()=>{drawing=false;panelOpen=false;update();};
+ dock.querySelector('.ink-stop').onclick=()=>{drawing=false;panelOpen=false;update();};
+ dock.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;drawing=true;update();});
+ dock.querySelector('select').onchange=e=>width=Number(e.target.value);
+ dock.querySelector('.ink-undo').onclick=()=>{strokes.pop();persist();draw();};dock.querySelector('.ink-clear').onclick=()=>{strokes=[];persist();draw();};
+ const touches=new Map();let gesture=false,lastY=0;
+ canvas.onpointerdown=e=>{if(!enabled||!drawing||locked||e.button!==0)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);if(e.pointerType==='touch'){touches.set(e.pointerId,e.clientY);if(touches.size>1){active=null;gesture=true;lastY=[...touches.values()].reduce((a,b)=>a+b,0)/touches.size;draw();return;}}active={color,width,points:[point(e)]};draw();};
+ canvas.onpointermove=e=>{if(touches.has(e.pointerId)){touches.set(e.pointerId,e.clientY);if(gesture){e.preventDefault();if(touches.size>1){const y=[...touches.values()].reduce((a,b)=>a+b,0)/touches.size;window.scrollBy(0,lastY-y);lastY=y;}return;}}if(!active)return;e.preventDefault();for(const v of e.getCoalescedEvents?.()||[e])active.points.push(point(v));draw();};
+ const finish=e=>{touches.delete(e.pointerId);if(gesture){if(!touches.size)gesture=false;return;}if(!active)return;active.points.push(point(e));strokes.push(active);active=null;persist();draw();};canvas.onpointerup=finish;canvas.onpointercancel=()=>{active=null;touches.clear();gesture=false;draw();};
+ observer=new ResizeObserver(()=>{resize();position();});observer.observe(paper);resize();update();
 }
 const original=render;render=function(){original();attach();};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&enabled){enabled=false;const b=document.querySelector('.ink-toggle');if(b){b.setAttribute('aria-pressed','false');b.classList.remove('primary');}document.querySelector('.ink-options')?.setAttribute('hidden','');if(canvas)canvas.style.pointerEvents='none';}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&enabled){document.querySelector('.ink-stop')?.click();}});
 })();
 
 // ── Google Drive senkronu (web sürümü) ───────────────────────────────────────
